@@ -1,0 +1,12 @@
+src/
+├── App.vue                  (👑 核心总控：负责初始化地图，统筹各个子组件)
+├── components/              (🎨 界面层：负责显示按钮、面板，处理用户点击)
+│   ├── ToolBar.vue          (导航栏：左侧的小图标菜单)
+│   ├── Model.vue            (业务面板：负责 3D Tiles 模型的加载与调整)
+│   ├── ControlWindow.vue    (业务面板：负责快捷视角切换)
+│   ├── CameraControl.vue    (业务面板：负责上帝视角的旋转与观察)
+│   │
+│   └── hooks/               (🧠 逻辑层/工具箱：纯 JS 文件，负责操作 Cesium)
+│       ├── model.js         (模型逻辑：封装了 Tiles3DManager 类)
+│       ├── fly.js           (飞行逻辑：封装了 flyTo 和视角状态)
+│       └── cameraControl.js (相机逻辑：封装了锁定目标、自动旋转算法)
