@@ -7,7 +7,7 @@
       @click="$emit('toggle', 'model')"
     >
         <span class="icon">🏗️</span>
-        <span class="label">模型管理</span>
+        <span class="label">模型管理 </span>
     </div>
 
     <!-- 2. 特效分析 (新增) -->
@@ -61,7 +61,7 @@ defineEmits(['toggle', 'toggleTerrain']);
 <style scoped>
 .toolbar {
   position: fixed;
-  top: 20px;
+  top: 120px;
   left: 20px;
   z-index: 2000;
   display: flex;

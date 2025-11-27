@@ -63,7 +63,7 @@ const { currentEffect, applyShader } = useCustomShader(viewerRef, tilesetRef);
 const effectNameMap = {
   'none': '原始模型',
   'scan': '城市数据扫描中...',
-  'radar': '区域雷达监测波放射中', // 新增描述
+  'radar': '区域雷达监测波放射中', 
   'tech': '赛博朋克线框模式',
   'rain': '雨天湿滑路面分析'
 };
@@ -78,7 +78,7 @@ const changeEffect = (type) => {
 </script>
 
 <style scoped>
-/* 样式保持不变 */
+
 .shader-panel {
   position: absolute;
   top: 120px;

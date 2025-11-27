@@ -115,7 +115,7 @@ onUnmounted(() => {
 
 .value {
   font-weight: bold;
-  color: #0155e6; /* 科技蓝高亮 */
+  color: #0084b8; /* 科技蓝高亮 */
   min-width: 60px; /* 占位防止抖动 */
 }
 </style>

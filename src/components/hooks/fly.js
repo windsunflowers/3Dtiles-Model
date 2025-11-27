@@ -37,7 +37,7 @@ export default () => {
         // 俯视城市视角 - 武汉坐标
         console.log('切换到城市视角')
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(114.3, 30.5, 50000),
+          destination: Cesium.Cartesian3.fromDegrees(114.3, 30.58, 50000),
           orientation: {
             heading: 0,
             pitch: Cesium.Math.toRadians(-90),
@@ -49,7 +49,7 @@ export default () => {
         // 模型视角
         console.log('切换到模型视角')
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(114.535120,30.495159,1000),
+          destination: Cesium.Cartesian3.fromDegrees(114.535263,30.493814,1000),
           orientation: {
             heading: 0,
             pitch: Cesium.Math.toRadians(-90),
