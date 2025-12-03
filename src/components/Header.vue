@@ -1,5 +1,5 @@
 <template>
-  <header class="header">武汉未来科技城</header>
+  <header class="header">3Dtiles模型展示</header>
 </template>
 
 <script setup>
@@ -29,8 +29,7 @@
   
   /* 背景设置：优先加载图片，如果失败则显示深蓝渐变 */
   background: 
-    url('../assets/images/header.png') center/cover no-repeat, 
-    linear-gradient(to bottom, rgba(0, 10, 30, 0.9), rgba(0, 50, 100, 0.5));
+    url('../assets/images/header2.png') center/cover no-repeat;
   
   /* 层级与交互 */
   z-index: 999;

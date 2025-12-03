@@ -1,15 +1,6 @@
 <template>
-  <div 
-    class="model-panel" 
-    ref="panelRef"
-    :style="panelStyle"
-  >
-    <!-- 标题栏：拖拽区域 -->
-    <div 
-      class="panel-header" 
-      @mousedown="startDrag"
-      title="按住拖动窗口"
-    >
+  <div class="model-panel" ref="panelRef" :style="panelStyle">
+    <div class="panel-header" @mousedown="startDrag" title="按住拖动窗口">
       <h3>🏗️ 模型管理</h3>
       <div class="header-controls">
         <button class="icon-btn" @click="handleResetAll" title="重置高度">↺</button>
@@ -18,77 +9,85 @@
     </div>
 
     <div class="panel-content">
-      <!-- 1. 加载区域 -->
       <div class="section load-section">
+        
+        <div class="input-label">模型 URL (JSON)</div>
         <div class="input-row">
           <input 
             v-model="modelUrl" 
             type="text" 
-            placeholder="输入 3D Tiles URL (json)"
+            placeholder="输入 3D Tiles URL"
+          />
+        </div>
+
+        <div class="input-label">Cesium Ion ID</div>
+        <div class="input-row">
+          <input 
+            v-model="ionId" 
+            type="number" 
+            placeholder="输入 Asset ID (例如: 69380)"
           />
         </div>
         
-
-     
         <div class="btn-group">
-          <button class="primary-btn" @click="handleLoad" :disabled="loading || !viewer">
-            {{ loading ? '加载中...' : '加载模型' }}
+          <button class="primary-btn" @click="handleLoadUrl" :disabled="loading || !viewer">
+            URL加载
           </button>
+          
+          <button class="primary-btn ion-btn" @click="handleLoadIon" :disabled="loading || !viewer">
+            Ion加载
+          </button>
+          
           <button class="danger-btn" @click="handleRemove" :disabled="!hasModel">
             清除
           </button>
         </div>
       </div>
 
-      <!-- 2. 调整区域 (加载后显示) -->
       <div v-if="hasModel" class="section adjustment-section">
-        <div class="divider"><span>模型已成功加载</span></div>
+        <div class="divider"><span>位置调整</span></div>
         
-        
+        <div class="control-item">
+          <div class="label-row">
+            <span>高度偏移 (Height)</span>
+            <span class="value-display">{{ params.height }} m</span>
+          </div>
+          <div class="input-group">
+            <input 
+              type="range" 
+              v-model.number="params.height" 
+              :min="-200" 
+              :max="200" 
+              step="1"
+              @input="updateTransform"
+            />
+            <input 
+              type="number" 
+              class="num-input" 
+              v-model.number="params.height"
+              @change="updateTransform"
+            />
+            <button class="icon-btn" @click="resetParam('height')" title="重置">↺</button>
+          </div>
+        </div>
+
+        <button class="secondary-btn" @click="handleClampToGround">
+          ⬇️ 自动贴地 (尝试修复浮空)
+        </button>
       </div>
     </div>
 
-    <!-- 右下角缩放手柄 -->
     <div class="resize-handle" @mousedown="startResize" title="拖动缩放窗口"></div>
-  <div v-if="hasModel" class="section adjustment-section">
-  <div class="divider"><span>位置调整</span></div>
-  
-  <div class="control-item">
-    <div class="label-row">
-      <span>高度偏移 (Height)</span>
-      <span class="value-display">{{ params.height }} m</span>
-    </div>
-    <div class="input-group">
-      <input 
-        type="range" 
-        v-model.number="params.height" 
-        :min="-200" 
-        :max="200" 
-        step="1"
-        @input="updateTransform"
-      />
-      <input 
-        type="number" 
-        class="num-input" 
-        v-model.number="params.height"
-        @change="updateTransform"
-      />
-      <button class="icon-btn" @click="resetParam('height')" title="重置">↺</button>
-    </div>
-  </div>
-
-  <button class="secondary-btn" @click="handleClampToGround">
-    ⬇️ 自动贴地 (尝试修复浮空)
-  </button>
-</div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onUnmounted, defineExpose, watch } from 'vue';
 import { Tiles3DManager } from './hooks/model.js';
-// ★★★ 必须引入 Cesium，否则无法进行坐标计算 ★★★
 import * as Cesium from 'cesium'; 
+
+// 配置 Cesium Token (确保可以访问 Ion 资源)
+Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI4ZWE3YzM1YS1jMmY4LTQwMDMtODAyOS1mMjQ1ZjhhMmFiMjYiLCJpZCI6MzU4ODAxLCJpYXQiOjE3NjI3NTM5Mjl9.KAOSJw8lC-9nbrC1wz1dbOcdnFH0fmQ_9n0On2o5BYI";
 
 const emit = defineEmits(['close', 'tilesetLoaded']);
 
@@ -98,13 +97,17 @@ const manager = ref(null);
 const loading = ref(false);
 const hasModel = ref(false);
 
+// 输入状态
 const modelUrl = ref('http://192.168.3.111:8088/gaeaExplorerServer/model/webqxsy/武汉未来科技城/tileset.json');
+
+// 43978 点云模型
+const ionId = ref(69380);
 
 const params = reactive({
   height: 0
 });
 
-// --- 窗口交互状态 (保持不变) ---
+// --- 窗口交互状态 ---
 const panelRef = ref(null);
 const position = reactive({ top: 80, left: window.innerWidth - 350 });
 const size = reactive({ width: 320, height: null }); 
@@ -113,20 +116,17 @@ const resizing = ref(false);
 const dragOffset = reactive({ x: 0, y: 0 });
 const resizeStart = reactive({ x: 0, y: 0, w: 0, h: 0 });
 
-// 样式计算 (保持不变)
+// 样式计算
 const panelStyle = computed(() => ({
   top: `${position.top}px`,
   left: `${position.left}px`,
-  right: 'auto', 
-  bottom: 'auto',
   width: `${size.width}px`,
   height: size.height ? `${size.height}px` : 'auto',
   cursor: dragging.value ? 'move' : 'default',
-  transition: 'none', 
   userSelect: dragging.value ? 'none' : 'auto'
 }));
 
-// --- 拖拽与缩放逻辑 (保持不变) ---
+// --- 拖拽与缩放逻辑 ---
 const startDrag = (e) => {
   if (['INPUT', 'BUTTON', 'LABEL'].includes(e.target.tagName)) return;
   dragging.value = true;
@@ -139,10 +139,8 @@ const onDrag = (e) => {
   if (!dragging.value) return;
   const maxX = window.innerWidth - 50;
   const maxY = window.innerHeight - 50;
-  let newLeft = e.clientX - dragOffset.x;
-  let newTop = e.clientY - dragOffset.y;
-  position.left = Math.max(-size.width + 50, Math.min(newLeft, maxX));
-  position.top = Math.max(0, Math.min(newTop, maxY));
+  position.left = Math.max(-size.width + 50, Math.min(e.clientX - dragOffset.x, maxX));
+  position.top = Math.max(0, Math.min(e.clientY - dragOffset.y, maxY));
 };
 const stopDrag = () => {
   dragging.value = false;
@@ -170,7 +168,7 @@ const stopResize = () => {
   window.removeEventListener('mouseup', stopResize);
 };
 
-// --- ★★★ 核心业务逻辑修正 ★★★ ---
+// --- ★★★ 核心业务逻辑 ★★★ ---
 
 const setViewer = (v) => {
   if (!v) return;
@@ -178,21 +176,38 @@ const setViewer = (v) => {
   manager.value = new Tiles3DManager(v);
 };
 
-const handleLoad = async () => {
-  if (!manager.value || !modelUrl.value) return;
+// 封装通用的加载执行过程
+const executeLoad = async (loadFn) => {
+  if (!manager.value) return;
   loading.value = true;
   try {
-    const tileset = await manager.value.loadTileset(modelUrl.value);
+    const tileset = await loadFn();
     hasModel.value = true;
-    handleResetAll();
+    handleResetAll(); // 加载新模型时重置参数
     console.log("模型加载成功", tileset);
     emit('tilesetLoaded', tileset);
   } catch (error) {
-    console.error("模型加载失败", error);
-    alert("加载失败，请检查 URL 或网络");
+    console.error("加载失败", error);
+    alert("加载失败，请检查控制台报错 (可能是 ID 无效或无权访问)");
   } finally {
     loading.value = false;
   }
+};
+
+// 1. URL 加载入口
+const handleLoadUrl = () => {
+  if (!modelUrl.value) return;
+  executeLoad(() => manager.value.loadFromUrl(modelUrl.value));
+};
+
+// 2. Ion 加载入口 (支持动态 ID)
+const handleLoadIon = () => {
+  if (!ionId.value) {
+    alert("请输入有效的 Ion ID");
+    return;
+  }
+  // 将输入框的值传给 loadFromIon
+  executeLoad(() => manager.value.loadFromIon(Number(ionId.value)));
 };
 
 const updateTransform = () => {
@@ -221,13 +236,9 @@ const handleRemove = () => {
   }
 };
 
-// ★★★ 重点：修复后的自动贴地功能 ★★★
+// 自动贴地功能
 const handleClampToGround = async () => {
-  // 1. 检查状态
-  if (!manager.value || !manager.value.tileset || !viewer.value) {
-    console.warn("模型或 Viewer 未就绪");
-    return;
-  }
+  if (!manager.value || !manager.value.tileset || !viewer.value) return;
 
   const btn = document.querySelector('.secondary-btn');
   const originalText = btn ? btn.innerText : '自动贴地';
@@ -235,27 +246,15 @@ const handleClampToGround = async () => {
 
   try {
     const tileset = manager.value.tileset;
-    // 强制更新 tileset 的位置矩阵，确保 boundingSphere 是最新的
     tileset.update(viewer.value.scene.frameState);
-
-    // 2. 获取模型当前的包围球信息
-  
     const centerCartesian = tileset.boundingSphere.center;
     const cartographic = Cesium.Cartographic.fromCartesian(centerCartesian);
+    const currentModelHeight = cartographic.height;
 
-    // 3. 计算模型底部的视觉高度
-    // 核心修正：用球心高度 - 半径 = 模型大概的底部高度
-    const currentModelHeight =cartographic.height;
-
-    // 4. 获取当前经纬度的地面真实高度 (地形采样)
     let terrainHeight = 0;
     const terrainProvider = viewer.value.scene.terrainProvider;
     
-    // 判断是否有地形服务
-    if (terrainProvider instanceof Cesium.EllipsoidTerrainProvider) {
-      terrainHeight = 0; // 无地形时默认为 0
-    } else {
-      // 有地形时，异步采样
+    if (!(terrainProvider instanceof Cesium.EllipsoidTerrainProvider)) {
       const updatedPositions = await Cesium.sampleTerrainMostDetailed(
         terrainProvider, 
         [cartographic]
@@ -263,37 +262,24 @@ const handleClampToGround = async () => {
       terrainHeight = updatedPositions[0].height || 0;
     }
 
-    // 5. 计算需要移动的差值 (Diff)
-    // 目标是让 bottomHeight == terrainHeight
-    // 差值 = 地形高度 - 当前底部高度
-    const diff = (terrainHeight - currentModelHeight)/2+5; // +5 米缓冲，避免贴地过紧
-
-    console.log(`
-      球心高度: ${cartographic.height.toFixed(2)}
-      目标地面: ${terrainHeight.toFixed(2)}
-      需修正: ${diff.toFixed(2)}
-    `);
-
-    // 6. 应用修正
-    // 注意：我们要在现有的 params.height 基础上累加这个差值
-    // 使用 Math.floor 取整，避免小数点过多导致的浮点数抖动
+    // 差值 = 地形高度 - 当前底部高度 + 缓冲
+    const diff = (terrainHeight - currentModelHeight) / 2 + 5; 
     params.height = Math.floor(params.height + diff);
-    
-    // 触发更新
     updateTransform();
 
   } catch (error) {
     console.error("贴地计算失败:", error);
-    alert("自动贴地失败，请确保地形服务正常");
   } finally {
     if (btn) btn.innerText = originalText;
   }
 };
 
+// watch 监听 (已修复循环引用问题)
 watch([manager, modelUrl], ([newManager, newUrl]) => {
   if (newManager && newUrl && !hasModel.value) {
-    // 自动加载逻辑，可选
-    handleLoad(); 
+    // 自动加载 URL (如果需要)
+    // handleLoadUrl(); 
+    handleLoadIon();
   }
 });
 
@@ -309,6 +295,15 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 保持原有样式的同时，增加一点间距 */
+.input-label {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  margin-top: 8px; /* 增加一点上边距，区分两个输入框 */
+}
+.input-label:first-child { margin-top: 0; }
+
 .model-panel {
   position: fixed;
   background: rgba(15, 23, 42, 0.95);
@@ -332,7 +327,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   cursor: grab;
-  user-select: none; /* 防止拖拽时选中文字 */
+  user-select: none;
 }
 .panel-header:active { cursor: grabbing; }
 
@@ -350,7 +345,7 @@ onUnmounted(() => {
   align-items: center;
 }
 
-.icon-btn, .close-btn, .reset-icon {
+.icon-btn, .close-btn {
   background: none;
   border: none;
   color: #94a3b8;
@@ -362,7 +357,7 @@ onUnmounted(() => {
   padding: 4px;
   border-radius: 4px;
 }
-.icon-btn:hover, .reset-icon:hover { color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
+.icon-btn:hover { color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
 .close-btn { font-size: 20px; line-height: 1; }
 .close-btn:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
 
@@ -372,7 +367,7 @@ onUnmounted(() => {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px; /* 调整间距 */
 }
 
 .input-row input {
@@ -388,15 +383,7 @@ onUnmounted(() => {
 }
 .input-row input:focus { border-color: #3b82f6; }
 
-.quick-links {
-  font-size: 11px;
-  text-align: right;
-  color: #64748b;
-  margin-top: -4px;
-}
-.quick-links span { color: #3b82f6; cursor: pointer; text-decoration: underline; }
-
-.btn-group { display: flex; gap: 10px; }
+.btn-group { display: flex; gap: 10px; margin-top: 8px; }
 .btn-group button {
   flex: 1;
   padding: 8px;
@@ -406,9 +393,14 @@ onUnmounted(() => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 .primary-btn { background: #3b82f6; color: white; }
 .primary-btn:hover:not(:disabled) { background: #2563eb; }
+
+.ion-btn { background: #10b981; color: white; }
+.ion-btn:hover:not(:disabled) { background: #059669; }
+
 .danger-btn { background: rgba(220, 38, 38, 0.15); color: #f87171; }
 .danger-btn:hover:not(:disabled) { background: rgba(220, 38, 38, 0.25); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }

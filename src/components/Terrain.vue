@@ -47,7 +47,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue';
-import useTdtTerrain from './hooks/arcgisTerrain.js';
+import useTdtTerrain from './hooks/tdtTerrain.js';
 
 const props = defineProps(['viewer']);
 const emit = defineEmits(['close']);

@@ -7,28 +7,28 @@ export class Tiles3DManager {
   }
 
   /**
-   * 加载 3D Tiles 模型
-   * @param {string} url - 模型的 json 地址
+   * 内部通用加载处理逻辑
+   * 无论是 URL 还是 Ion ID，最终都返回一个 Tileset Promise，后续处理逻辑是一样的
    */
-  async loadTileset(url) {
-    if (!this.viewer) {
-      throw new Error('Viewer 未初始化');
-    }
+  async _handleLoad(tilesetPromise) {
+    if (!this.viewer) throw new Error('Viewer 未初始化');
 
-    // 移除旧模型（确保彻底清理）
+    // 1. 移除旧模型
     this.removeTileset();
 
     try {
-      console.log(`正在加载模型: ${url}`);
-      
-      this.tileset = await Cesium.Cesium3DTileset.fromUrl(url, {
-        maximumScreenSpaceError: 16,
-        skipLevelOfDetail: true,
-        cullWithChildrenBounds: false
-      });
+      // 2. 等待模型实例化完成
+      this.tileset = await tilesetPromise;
 
+      // 3. 添加到场景
       this.viewer.scene.primitives.add(this.tileset);
 
+      // 4. 处理 Ion 资源的默认样式 (如果有)
+      if (this.tileset.asset && this.tileset.asset.extras?.ion?.defaultStyle) {
+         this.tileset.style = new Cesium.Cesium3DTileStyle(this.tileset.asset.extras.ion.defaultStyle);
+      }
+
+      // 5. 缩放视角
       await this.zoomToModel();
 
       return this.tileset;
@@ -38,6 +38,28 @@ export class Tiles3DManager {
       this.removeTileset(); 
       throw error;
     }
+  }
+
+  /**
+   * 通过 URL 加载 (原始功能)
+   */
+  async loadFromUrl(url) {
+    console.log(`正在从 URL 加载: ${url}`);
+    const promise = Cesium.Cesium3DTileset.fromUrl(url, {
+      maximumScreenSpaceError: 16,
+      skipLevelOfDetail: true,
+      cullWithChildrenBounds: false
+    });
+    return this._handleLoad(promise);
+  }
+
+  /**
+   * 通过 Ion Asset ID 加载 (新增功能)
+   */
+  async loadFromIon(assetId) {
+    console.log(`正在加载 Ion 资源: ${assetId}`);
+    const promise = Cesium.Cesium3DTileset.fromIonAssetId(assetId);
+    return this._handleLoad(promise);
   }
 
   /**
@@ -57,8 +79,7 @@ export class Tiles3DManager {
   }
 
   /**
-   * [新增] 统一更新模型变换参数
-   * 兼容 Model.vue 中的调用方式：manager.value.updateModel({ height: ... })
+   * 统一更新模型变换参数
    */
   updateModel(params) {
     if (!this.tileset) return;
@@ -71,7 +92,6 @@ export class Tiles3DManager {
 
   /**
    * 调整模型高度
-   * @param {number} heightOffset - 高度偏移量
    */
   adjustHeight(heightOffset) {
     if (!this.tileset) return;
@@ -109,7 +129,7 @@ export class Tiles3DManager {
       // 从场景中移除
       this.viewer.scene.primitives.remove(this.tileset);
       
-      // 显式销毁资源（可选，但在反复加载时有助于释放内存）
+      // 显式销毁资源
       if (!this.tileset.isDestroyed()) {
          this.tileset.destroy();
       }
@@ -118,4 +138,3 @@ export class Tiles3DManager {
     }
   }
 }
-
